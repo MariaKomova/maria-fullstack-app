@@ -32,8 +32,6 @@ jobs:
           context: ./backend
           push: true
           tags: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_BACKEND }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
       # 3. Сборка и отправка Frontend образа (nginx)
       - name: Build and Push Frontend Image
@@ -42,8 +40,6 @@ jobs:
           context: ./frontend
           push: true
           tags: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_FRONTEND }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
   deploy:
     runs-on: ubuntu-latest
