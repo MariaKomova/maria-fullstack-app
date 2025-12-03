@@ -8,8 +8,8 @@ on:
 
 env:
   DOCKER_REGISTRY: docker.io
-  DOCKER_IMAGE_BACKEND: mariakomova/fullstack-backend 
-  DOCKER_IMAGE_FRONTEND: mariakomova/fullstack-frontend 
+  DOCKER_IMAGE_BACKEND: moreiamoreia/fullstack-backend_v2 
+  DOCKER_IMAGE_FRONTEND: moreiamoreia/fullstack-frontend_v2
 
 jobs:
   build_and_push:
