@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevOps App - Frontend (Финальный Тест)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+    <!-- Добавьте ссылку на шрифт Inter, чтобы сделать UI красивее -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Добавляем Inter Font и общие стили */
+        body { font-family: 'Inter', sans-serif; }
+        .input-field { 
+            /* Стандартный стиль для полей ввода */
+            /* @apply - это синтаксис Tailwind для использования классов в CSS */
+            display: block; width: 100%; padding: 0.5rem 0.75rem; 
+            border: 1px solid #d1d5db; border-radius: 0.375rem; 
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+        /* Стили для полей в списке */
+        .item-row input[type="text"], .item-row input[type="number"] {
+            @apply px-2 py-1 border border-gray-300 rounded-md shadow-inner text-sm flex-grow;
+        }
+        /* Общие стили для CRUD кнопок */
+        .btn-crud {
+            @apply px-3 py-1 text-sm font-semibold rounded-lg transition duration-150 ease-in-out shadow-md;
+        }
+        .btn-update {
+            @apply bg-green-500 hover:bg-green-600 text-white;
+        }
+        .btn-delete {
+            @apply bg-red-500 hover:bg-red-600 text-white;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-start py-8">
+    <div id="status-message" class="fixed bottom-4 right-4 bg-gray-800 text-white p-3 rounded-lg shadow-xl hidden transition-opacity duration-300"></div>
+
+
+    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl mb-8">
+        <h1 class="text-3xl font-bold text-gray-800 mb-4 text-center">Контейнеры работают! 🎉</h1>
+        
+        <!-- СТАТУС БЭКЕНДА -->
+        <div id="backend-status" class="mt-4 p-3 rounded-lg font-mono text-sm text-center">
+            Загрузка статуса бэкенда...
+        </div>
+    </div>
+
+    <!-- ФОРМА ДЛЯ СОЗДАНИЯ НОВЫХ ЭЛЕМЕНТОВ -->
+    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl mb-8">
+        <h2 class="text-2xl font-semibold text-gray-700 mb-4">Создать новый элемент (POST)</h2>
+        <form id="create-form" class="space-y-4">
+            <div>
+                <label for="item-name" class="block text-sm font-medium text-gray-700">Имя:</label>
+                <input type="text" id="item-name" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 border">
+            </div>
+            <div>
+                <label for="item-value" class="block text-sm font-medium text-gray-700">Значение:</label>
+                <input type="number" id="item-value" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 border">
+            </div>
+            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150">
+                Добавить элемент
+            </button>
+        </form>
+        <p id="create-message" class="mt-4 text-sm"></p>
+    </div>
+
+    <!-- СПИСОК ЭЛЕМЕНТОВ И КНОПКА ЗАГРУЗКИ -->
+    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl">
+        <h2 class="text-2xl font-semibold text-gray-700 mb-4">Данные из БД (GET /api/items)</h2>
+        <button id="load-items-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150 mb-4">
+            Загрузить все элементы
+        </button>
+        <div id="items-list" class="space-y-2">
+            <p class="text-gray-500">Нажмите "Загрузить все элементы" для проверки связи с БД.</p>
+        </div>
+    </div>
+
+    <script>
+  // БАЗОВЫЙ ПУТЬ ДЛЯ API
+        const API_BASE_URL = '/api/items';
+        const HEALTH_URL = '/api/health';
+
+        // --- Вспомогательная функция для уведомлений (вместо alert/confirm) ---
+        function showStatus(message, isSuccess = true) {
+            const statusDiv = document.getElementById('status-message');
+            statusDiv.textContent = message;
+            statusDiv.classList.remove('hidden', 'bg-red-600', 'bg-green-600');
+            statusDiv.classList.add(isSuccess ? 'bg-green-600' : 'bg-red-600');
+            
+            setTimeout(() => {
+                statusDiv.classList.add('hidden');
+            }, 4000);
+        }
+
+        // --- ФУНКЦИИ СТАТУСА ---
+        async function checkBackendStatus() {
+            const statusDiv = document.getElementById('backend-status');
+            try {
+                const response = await fetch(HEALTH_URL);
+                const data = await response.json();
+
+                if (response.ok && data.status === 'ok') {
+                    statusDiv.className = 'mt-4 p-3 rounded-lg font-mono text-sm bg-green-100 text-green-700';
+                    statusDiv.textContent = `✅ Бэкенд (API) доступен! Статус БД: ${data.db_status.toUpperCase()}`;
+                    loadItems(); 
+                } else {
+                    statusDiv.className = 'mt-4 p-3 rounded-lg font-mono text-sm bg-yellow-100 text-yellow-700';
+                    statusDiv.textContent = `⚠️ Бэкенд отвечает, но БД недоступна. Статус: ${data.db_status.toUpperCase()}`;
+                }
+            } catch (error) {
+                statusDiv.className = 'mt-4 p-3 rounded-lg font-mono text-sm bg-red-100 text-red-700';
+                statusDiv.textContent = '❌ Не удалось подключиться к бэкенду. Проверьте логи контейнера Flask.';
+            }
+        }
+
+        // --- ФУНКЦИИ CRUD ---
+        
+        // ОБНОВЛЕННАЯ ФУНКЦИЯ: Рендеринг элементов с полями для редактирования и кнопками
+        function renderItems(items) {
+            const listDiv = document.getElementById('items-list');
+            listDiv.innerHTML = '';
+
+            if (items.length === 0) {
+                listDiv.innerHTML = '<p class="text-gray-500">В базе данных нет элементов.</p>';
+                return;
+            }
+
+            items.forEach(item => {
+                const itemElement = document.createElement('div');
+                itemElement.id = `item-${item.id}`; // Для легкого доступа
+                // Новая структура для строки с редактируемыми полями
+                itemElement.className = 'item-row flex flex-col md:flex-row gap-2 items-center p-3 bg-gray-50 border border-gray-200 rounded-lg shadow-sm';
+                itemElement.innerHTML = `
+                    <span class="font-mono text-xs text-gray-500 w-10">ID: ${item.id}</span>
+                    <!-- Редактируемое поле Имя -->
+                    <input type="text" id="name-${item.id}" value="${item.name}" required class="item-row input-field w-full md:w-auto">
+                    <!-- Редактируемое поле Значение -->
+                    <input type="number" id="value-${item.id}" value="${item.value}" required class="item-row input-field w-full md:w-auto">
+                    
+                    <!-- Кнопки Обновить и Удалить -->
+                    <div class="flex space-x-2 w-full md:w-auto md:ml-auto">
+                        <button onclick="updateItem(${item.id})" class="btn-crud btn-update w-1/2 md:w-auto">Обновить</button>
+                        <button onclick="deleteItem(${item.id})" class="btn-crud btn-delete w-1/2 md:w-auto">Удалить</button>
+                    </div>
+                `;
+                listDiv.appendChild(itemElement);
+            });
+        }
+
+        // Загрузка всех элементов (Read)
+        async function loadItems() {
+            const listDiv = document.getElementById('items-list');
+            listDiv.innerHTML = '<p class="text-blue-500">Загрузка данных...</p>';
+
+            try {
+                const response = await fetch(API_BASE_URL);
+
+                if (response.ok) {
+                    const items = await response.json();
+                    renderItems(items);
+                } else {
+                    listDiv.innerHTML = `<p class="text-red-500">Ошибка загрузки элементов: ${response.statusText}</p>`;
+                }
+            } catch (error) {
+                listDiv.innerHTML = `<p class="text-red-500">Ошибка сети при загрузке: ${error.message}</p>`;
+            }
+        }
+        
+        // Создание нового элемента (Create)
+        async function createItem(event) {
+            event.preventDefault();
+            const nameInput = document.getElementById('item-name');
+            const valueInput = document.getElementById('item-value');
+            const messageDiv = document.getElementById('create-message');
+
+            const item = {
+                name: nameInput.value,
+                value: parseInt(valueInput.value)
+            };
+            
+            try {
+                const response = await fetch(API_BASE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(item)
+                });
+
+                if (response.status === 201) {
+                    showStatus(`Успешно создан: ${item.name}`, true);
+                    messageDiv.textContent = `Успешно создан: ${item.name}`;
+                    messageDiv.className = 'text-green-600';
+                    
+                    nameInput.value = '';
+                    valueInput.value = '';
+                    loadItems(); 
+                } else {
+                    const errorData = await response.json();
+                    showStatus(`Ошибка создания: ${errorData.error || response.statusText}`, false);
+                    messageDiv.textContent = `Ошибка создания: ${errorData.error || response.statusText}`;
+                    messageDiv.className = 'text-red-600';
+                }
+            } catch (error) {
+                showStatus('Ошибка сети при создании элемента.', false);
+                messageDiv.textContent = 'Ошибка сети при создании элемента.';
+                messageDiv.className = 'text-red-600';
+            }
+        }
+
+        // --- НОВАЯ ФУНКЦИЯ: Обновление элемента (Update/PUT) ---
+        async function updateItem(id) {
+            // Получаем актуальные значения из полей ввода
+            const name = document.getElementById(`name-${id}`).value.trim();
+            const value = parseInt(document.getElementById(`value-${id}`).value);
+
+            if (!name || isNaN(value)) {
+                showStatus('Имя и Значение не могут быть пустыми или нечисловыми.', false);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name, value: value })
+                });
+
+                if (response.ok) {
+                    showStatus(`Элемент ID ${id} успешно обновлен!`, true);
+                    loadItems(); // Перезагрузка для обновления UI
+                } else {
+                    const errorData = await response.json();
+                    showStatus(`Ошибка обновления: ${errorData.error || response.statusText}`, false);
+                }
+            } catch (error) {
+                showStatus(`Ошибка сети при обновлении: ${error.message}`, false);
+            }
+        }
+        
+        // --- НОВАЯ ФУНКЦИЯ: Удаление элемента (Delete/DELETE) ---
+        async function deleteItem(id) {
+            // Используем window.confirm() для простоты, но в реальном приложении это должен быть модал
+            if (!window.confirm(`Вы уверены, что хотите удалить элемент ID ${id}?`)) {
+                 return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/${id}`, {
+                    method: 'DELETE'
+                });
+
+                // DELETE обычно возвращает 204 No Content
+                if (response.status === 204 || response.ok) {
+                    showStatus(`Элемент ID ${id} успешно удален.`, true);
+                    loadItems(); // Обновляем список
+                } else {
+                    const errorData = await response.json();
+                    showStatus(`Ошибка удаления: ${errorData.error || response.statusText}`, false);
+                }
+            } catch (error) {
+                showStatus(`Ошибка сети при удалении: ${error.message}`, false);
+            }
+        }
+
+
+        // --- ИНИЦИАЛИЗАЦИЯ ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Привязка событий к формам и кнопкам
+            document.getElementById('create-form').addEventListener('submit', createItem);
+            document.getElementById('load-items-btn').addEventListener('click', loadItems);
+
+            // Проверяем статус сразу и повторяем каждые 10 секунд
+            checkBackendStatus();
+            setInterval(checkBackendStatus, 10000);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+# Игнорируем большие исполняемые файлы, которые не должны быть в репозитории
+# .deb файл установщика Google Chrome:
+Загрузки/google-chrome-stable_current_amd64.deb
+
+# Исполняемый файл docker-compose (его не нужно бэкапить)
+.docker/cli-plugins/docker-compose
+
+# Временные системные папки и файлы
+Загрузки/
+Изображения/
+Документы/
+Видео/
+Музыка/
+.ssh/
+
+# Игнорируем стандартные файлы, генерируемые Node/Python
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Игнорируем файлы окружения с секретами, если они не нужны для билда
+.env
+
+# NEW RULE: Exclude all hidden directories and files globally
+.*
+!/.gitignore

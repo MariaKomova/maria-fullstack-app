@@ -1,0 +1,54 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: debug
+
+positions:
+  filename: /var/lib/promtail/positions.yaml
+
+clients:
+  # ФИНАЛЬНОЕ ИСПРАВЛЕНИЕ: Используем 127.0.0.1 (Loopback)
+  # Это необходимо, так как Promtail в режиме network_mode: host не может разрешить имя сервиса 'loki'.
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: app_logs
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+
+    relabel_configs:
+      - source_labels: ['__meta_docker_log_file']
+        target_label: '__path__'
+
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'instance'
+
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/[^_]+_(?P<service>[^_]+)_.*'
+        target_label: 'service'
+
+#      - source_labels: ['service']
+#        regex: ^(loki|promtail|grafana|prometheus|db)$
+#        action: drop
+
+      - target_label: job
+        replacement: app_logs
+
+    pipeline_stages:
+      - decolorize: {}
+            
+      - regex:
+          expression: '^(?P<host>\S+) \S+ \S+ \[(?P<time>[^\]]+)\] "(?P<method>\S+) (?P<path>\S+) (?P<protocol>\S+)" (?P<status>\d+) (?P<size>\S+)$'
+      
+      - timestamp:
+          source: time
+          format: 02/Jan/2006 15:04:05
+      
+      - labels:
+          status:
+
+      - output:
+          source: status
+
