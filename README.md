@@ -89,3 +89,5 @@ curl -X DELETE http://localhost/items/1
 Ошибка аутентификации БД (FATAL): Произошло несоответствие паролей. Выполните полный сброс, чтобы удалить старый том БД: docker-compose down -v.
 
 Ошибка 405/502: Проверьте frontend/nginx.conf на корректность порта (8000) и разрешения всех методов (GET|POST|PUT|DELETE|OPTIONS).
+
+.
