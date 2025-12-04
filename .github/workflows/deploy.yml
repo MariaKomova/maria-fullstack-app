@@ -4,26 +4,21 @@ on:
   push:
     branches:
       - main
-  # Позволяет запускать рабочий процесс вручную
   workflow_dispatch:
 
 env:
   DOCKER_REGISTRY: docker.io
   DOCKER_IMAGE_BACKEND: moreiamoreia/fullstack-backend_v2
   DOCKER_IMAGE_FRONTEND: moreiamoreia/fullstack-frontend_v2
-  TARGET_PATH: ~/app/ # Рабочая директория на удаленном сервере
+  TARGET_PATH: ~/app/
 
 jobs:
-  # =======================================================================
-  # JOB 1: Сборка и отправка образов в Docker Hub
-  # =======================================================================
   build_and_push:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Проверка: наличие secrets.DOCKER_USERNAME и secrets.DOCKER_PASSWORD
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -44,52 +39,40 @@ jobs:
           push: true
           tags: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_FRONTEND }}:latest
 
-  # =======================================================================
-  # JOB 2: Деплой на удаленный сервер
-  # =======================================================================
   deploy:
     runs-on: ubuntu-latest
     needs: build_and_push
     steps:
-      # Нам не нужно скачивать код для деплоя, но нам нужен docker-compose.yml!
       - name: Checkout Code (for config files)
         uses: actions/checkout@v4
         
-      # --- ПРЕДВАРИТЕЛЬНАЯ НАСТРОЙКА СЕРВЕРА ---
-      - name: Setup Deployment Environment (Install docker-compose)
+      - name: Setup Deployment Environment (Install Compose & Docker Login)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_KEY }} # Используем ваш существующий секрет SSH_KEY
+          key: ${{ secrets.SSH_KEY }}
           script: |
-            echo "1. Ensuring working directory exists..."
+            echo "1. Ensuring working directory exists and installing Compose..."
             mkdir -p ${{ env.TARGET_PATH }}
             
-            echo "2. Installing Docker Compose V2 (plugin)..."
-            # Устанавливаем официальный плагин Docker Compose V2
             sudo apt update
             sudo apt install docker-compose-plugin -y
-            # V2 устанавливается как 'docker compose' (без дефиса)
             
-            echo "3. Logging into Docker Hub on the server..."
-            # Логинимся на сервере, чтобы он мог скачать приватные образы
+            echo "2. Logging into Docker Hub on the server..."
             docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }} docker.io
             
             echo "Server setup complete."
 
-      # --- ПЕРЕНОС ФАЙЛОВ КОНФИГУРАЦИИ ---
       - name: Transfer Docker Compose Configs to VM
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
-          # Переносим только необходимые файлы для деплоя Compose
-          source: "docker-compose.yml,.env" # Добавьте сюда любые другие нужные файлы (например, .env)
+          source: "docker-compose.yml,.env" 
           target: "${{ env.TARGET_PATH }}"
           
-      # --- ЗАПУСК КОНТЕЙНЕРОВ ---
       - name: Run Docker Compose Deployment
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -99,16 +82,12 @@ jobs:
           script: |
             echo "--- STARTING DOCKER COMPOSE DEPLOYMENT ---"
             
-            # Переходим в директорию, куда перенесли файлы
             cd ${{ env.TARGET_PATH }}
             
-            # 1. Скачиваем новые версии образов с Docker Hub
             echo "Pulling latest images..."
-            # Используем docker compose V2
             docker compose pull
             
-            # 2. Пересоздаем и запускаем сервисы
             echo "Recreating and starting services..."
             docker compose up --force-recreate --remove-orphans -d
             
-            echo "Deployment finished successfully. Check logs for my_app_container."
+            echo "Deployment finished successfully. Check logs for your containers."
