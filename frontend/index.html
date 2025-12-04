@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DevOps App - Frontend (Финальный Тест)</title>
     <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.tailwindcss.com"></script>
     <!-- Добавьте ссылку на шрифт Inter, чтобы сделать UI красивее -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -241,10 +240,12 @@
         // --- НОВАЯ ФУНКЦИЯ: Удаление элемента (Delete/DELETE) ---
         async function deleteItem(id) {
             // Используем window.confirm() для простоты, но в реальном приложении это должен быть модал
+            /*
             if (!window.confirm(`Вы уверены, что хотите удалить элемент ID ${id}?`)) {
                  return;
             }
-
+            */
+        
             try {
                 const response = await fetch(`${API_BASE_URL}/${id}`, {
                     method: 'DELETE'
