@@ -1,8 +1,4 @@
-FROM python:3.11-slim
-ENV PYTHONUNBUFFERED 1
-WORKDIR /app
-COPY backend/requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
-COPY backend/ .
-EXPOSE 8000
-CMD ["python", "main.py"]
+FROM nginx:alpine
+RUN rm /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY . /usr/share/nginx/html
