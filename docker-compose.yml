@@ -22,7 +22,7 @@ services:
       - app_network
 
   backend:
-    build: ./backend
+    image: moreiamoreia/fullstack-backend_v2:latest # Используем образ из CI/CD
     restart: unless-stopped
     ports:
       - "5000:5000"
@@ -45,11 +45,13 @@ services:
       - app_network
 
   frontend:
-    image: nginx:stable-alpine
+    # ИСПРАВЛЕНО: Используем образ, собранный и отправленный вашим CI/CD пайплайном
+    image: moreiamoreia/fullstack-frontend_v2:latest 
     container_name: maria_frontend_1
     restart: always
     volumes:
-      - ./frontend/index.html:/usr/share/nginx/html/index.html
+      # Оставляем монтирование nginx.conf для проксирования API, 
+      # но удаляем монтирование index.html, так как статика должна быть в образе.
       - ./frontend/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
       - "8080:80"
@@ -57,7 +59,8 @@ services:
       - backend
     networks:
       - app_network
-    command: /bin/sh -c "sleep 10 && /docker-entrypoint.sh nginx -g 'daemon off;'"
+    # Команда /bin/sh -c "sleep 10..." больше не нужна, если образ основан на Nginx и статика внутри.
+    # Если вам нужно, чтобы контейнер ждал, лучше использовать "depends_on: condition: service_healthy"
 
   loki:
     image: grafana/loki:latest
@@ -66,7 +69,7 @@ services:
       - ./monitoring/loki-local-config.yaml:/etc/loki/local-config.yaml
     command: -config.file=/etc/loki/local-config.yaml
     ports:
-      - "3100:3100" 
+      - "3100:3100"
     networks:
       - app_network
 
@@ -94,7 +97,7 @@ services:
       - ./monitoring/promtail-config.yml:/etc/promtail/config.yml:ro
       - promtail_positions:/var/lib/promtail
     command: -config.file=/etc/promtail/config.yml
-    user: root 
+    user: root
     depends_on:
       - loki
     networks:
@@ -124,4 +127,3 @@ volumes:
 networks:
   app_network:
     driver: bridge
-
