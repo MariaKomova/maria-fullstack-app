@@ -48,20 +48,28 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         
-      # 4. Деплой на удаленный сервер через SSH (ВКЛЮЧЕН РЕЖИМ ОТЛАДКИ)
-      - name: Deploy to Remote Server
+      # --- НОВЫЙ ШАГ: ЗАПИСЬ ПРИВАТНОГО КЛЮЧА В ФАЙЛ ---
+      - name: Write SSH Key to File
+        id: write_key
+        run: |
+          # Создаем файл ключа, используя переменную окружения для обхода экранирования
+          echo "${{ secrets.SSH_KEY }}" > .ssh_key
+          # Устанавливаем правильные права доступа
+          chmod 600 .ssh_key
+          # Экспортируем путь к ключу для следующего шага
+          echo "KEY_PATH=$(pwd)/.ssh_key" >> $GITHUB_ENV
+      # --------------------------------------------------
+
+      # 4. Деплой на удаленный сервер через SSH 
+      - name: Deploy to Remote Server (Using Key File)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
-          key: | 
-            ${{ secrets.SSH_KEY }}
+          # Используем путь к созданному файлу ключа
+          key_path: ${{ env.KEY_PATH }}
+          
           port: 22
-          # Дополнительные флаги для отладки
-          debug: true
-          request_pty: true
-          use_insecure_cipher: true
-          key_path: /dev/null # Убеждаемся, что ключ берется только из переменной
           
           # Команды, которые выполняются на Debian-сервере:
           script: |
