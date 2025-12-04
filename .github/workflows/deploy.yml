@@ -1,31 +1,35 @@
-name: CI/CD Pipeline to Debian Server
+name: Fullstack CI/CD Pipeline
 
 on:
   push:
     branches:
       - main
+  # Позволяет запускать рабочий процесс вручную
   workflow_dispatch:
 
 env:
   DOCKER_REGISTRY: docker.io
-  DOCKER_IMAGE_BACKEND: moreiamoreia/fullstack-backend_v2 
+  DOCKER_IMAGE_BACKEND: moreiamoreia/fullstack-backend_v2
   DOCKER_IMAGE_FRONTEND: moreiamoreia/fullstack-frontend_v2
+  TARGET_PATH: ~/app/ # Рабочая директория на удаленном сервере
 
 jobs:
+  # =======================================================================
+  # JOB 1: Сборка и отправка образов в Docker Hub
+  # =======================================================================
   build_and_push:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 1. Аутентификация в Docker Hub
+      # Проверка: наличие secrets.DOCKER_USERNAME и secrets.DOCKER_PASSWORD
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # 2. Сборка и отправка Backend образа
       - name: Build and Push Backend Image
         uses: docker/build-push-action@v5
         with:
@@ -33,7 +37,6 @@ jobs:
           push: true
           tags: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_BACKEND }}:latest
 
-      # 3. Сборка и отправка Frontend образа (nginx)
       - name: Build and Push Frontend Image
         uses: docker/build-push-action@v5
         with:
@@ -41,37 +44,71 @@ jobs:
           push: true
           tags: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_FRONTEND }}:latest
 
+  # =======================================================================
+  # JOB 2: Деплой на удаленный сервер
+  # =======================================================================
   deploy:
     runs-on: ubuntu-latest
     needs: build_and_push
     steps:
-      - name: Checkout Code
+      # Нам не нужно скачивать код для деплоя, но нам нужен docker-compose.yml!
+      - name: Checkout Code (for config files)
         uses: actions/checkout@v4
         
-      # --- МЕНЕДЖЕР КЛЮЧЕЙ ---
-      - name: Load SSH Key to Agent
-        uses: shimataro/ssh-key-action@v2
-        with:
-          key: ${{ secrets.SSH_KEY }}
-          known_hosts: 'placeholder-known-hosts' 
-      # ------------------------
-      
-      # !!! УДАЛЕН ШАГ 'ssh-add -l' ВО ИЗБЕЖАНИЕ СБОЯ !!!
-
-      # 4. Деплой на удаленный сервер через SSH (Ключ берется из агента)
-      - name: Deploy to Remote Server (Using SSH Agent)
+      # --- ПРЕДВАРИТЕЛЬНАЯ НАСТРОЙКА СЕРВЕРА ---
+      - name: Setup Deployment Environment (Install docker-compose)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
-          port: 22
-          
-          # Команды, которые выполняются на Debian-сервере:
+          key: ${{ secrets.SSH_KEY }} # Используем ваш существующий секрет SSH_KEY
           script: |
-            echo "--- STARTING DEPLOYMENT ---"
+            echo "1. Ensuring working directory exists..."
+            mkdir -p ${{ env.TARGET_PATH }}
             
-            # Обновление образов (pull) и перезапуск контейнеров
-            sudo /usr/local/bin/docker-compose -f docker-compose.yml pull
-            sudo /usr/local/bin/docker-compose -f docker-compose.yml up --force-recreate --remove-orphans -d
+            echo "2. Installing Docker Compose V2 (plugin)..."
+            # Устанавливаем официальный плагин Docker Compose V2
+            sudo apt update
+            sudo apt install docker-compose-plugin -y
+            # V2 устанавливается как 'docker compose' (без дефиса)
             
-            echo "Deployment finished successfully."
+            echo "3. Logging into Docker Hub on the server..."
+            # Логинимся на сервере, чтобы он мог скачать приватные образы
+            docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }} docker.io
+            
+            echo "Server setup complete."
+
+      # --- ПЕРЕНОС ФАЙЛОВ КОНФИГУРАЦИИ ---
+      - name: Transfer Docker Compose Configs to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          # Переносим только необходимые файлы для деплоя Compose
+          source: "docker-compose.yml,.env" # Добавьте сюда любые другие нужные файлы (например, .env)
+          target: "${{ env.TARGET_PATH }}"
+          
+      # --- ЗАПУСК КОНТЕЙНЕРОВ ---
+      - name: Run Docker Compose Deployment
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            echo "--- STARTING DOCKER COMPOSE DEPLOYMENT ---"
+            
+            # Переходим в директорию, куда перенесли файлы
+            cd ${{ env.TARGET_PATH }}
+            
+            # 1. Скачиваем новые версии образов с Docker Hub
+            echo "Pulling latest images..."
+            # Используем docker compose V2
+            docker compose pull
+            
+            # 2. Пересоздаем и запускаем сервисы
+            echo "Recreating and starting services..."
+            docker compose up --force-recreate --remove-orphans -d
+            
+            echo "Deployment finished successfully. Check logs for my_app_container."
