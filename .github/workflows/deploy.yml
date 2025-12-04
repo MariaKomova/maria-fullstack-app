@@ -70,7 +70,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
-          source: "docker-compose.yml,.env" 
+          source: "docker-compose.yml,.env"
           target: "${{ env.TARGET_PATH }}"
           
       - name: Run Docker Compose Deployment
@@ -79,15 +79,22 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
+          # ИЗМЕНЕННЫЙ СКРИПТ: Использует down -> pull -> up для гарантированного обновления контейнеров.
           script: |
-            echo "--- STARTING DOCKER COMPOSE DEPLOYMENT ---"
+            echo "--- STARTING FORCED DEPLOYMENT ---"
             
             cd ${{ env.TARGET_PATH }}
             
-            echo "Pulling latest images..."
+            echo "1. Stopping and removing old containers..."
+            # Полностью останавливаем и удаляем старые контейнеры, чтобы гарантировать чистый запуск с новым образом
+            docker compose down --remove-orphans 
+            
+            echo "2. Pulling the latest images from registry..."
+            # Загружаем свежие образы
             docker compose pull
             
-            echo "Recreating and starting services..."
-            docker compose up --force-recreate --remove-orphans -d
+            echo "3. Starting services with fresh images..."
+            # Запускаем сервисы
+            docker compose up -d
             
             echo "Deployment finished successfully. Check logs for your containers."
