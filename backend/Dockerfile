@@ -12,4 +12,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD ["flask", "run", "--host=0.0.0.0", "--port=8000"]
+EXPOSE 8000
+
+# ИСПОЛЬЗУЕМ GUNICORN И ОЖИДАЕМ БАЗУ ДАННЫХ
+# wait-for-it.sh ждет, пока сервис 'db' будет доступен на порту 5432.
+# Только после этого запускается Gunicorn.
+CMD ["/usr/local/bin/wait-for-it.sh", "db:5432", "--timeout=30", "--", \
+     "gunicorn", "--workers", "4", "--bind", "0.0.0.0:8000", "app:app"]
+# CMD ["flask", "run", "--host=0.0.0.0", "--port=8000"]
