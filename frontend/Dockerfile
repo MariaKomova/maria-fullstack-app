@@ -1,11 +1,8 @@
-FROM node:20-alpine AS builder
+FROM python:3.11-slim
+ENV PYTHONUNBUFFERED 1
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm install
-COPY . .
-RUN npm run build 
-FROM nginx:alpine
-RUN rm /etc/nginx/conf.d/default.conf
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=builder /app/build /usr/share/nginx/html
-EXPOSE 80
+COPY backend/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+COPY backend/ .
+EXPOSE 8000
+CMD ["python", "main.py"]
