@@ -54,7 +54,8 @@ jobs:
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_KEY }}
+          key: | 
+            ${{ secrets.SSH_KEY }}
           port: 22
           # Дополнительные флаги для отладки
           debug: true
