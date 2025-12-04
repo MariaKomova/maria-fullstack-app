@@ -48,7 +48,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         
-      # 4. Деплой на удаленный сервер через SSH
+      # 4. Деплой на удаленный сервер через SSH (ВКЛЮЧЕН РЕЖИМ ОТЛАДКИ)
       - name: Deploy to Remote Server
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -56,13 +56,18 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           port: 22
+          # Дополнительные флаги для отладки
+          debug: true
+          request_pty: true
+          use_insecure_cipher: true
+          key_path: /dev/null # Убеждаемся, что ключ берется только из переменной
+          
           # Команды, которые выполняются на Debian-сервере:
           script: |
-            echo "--- PULLING LATEST DOCKER COMPOSE FILE ---"
-            cd /home/${{ secrets.SSH_USERNAME }}
-            git pull origin main
-            
             echo "--- STARTING DEPLOYMENT ---"
-            sudo /usr/local/bin/docker-compose -f docker-compose.yml up --build --force-recreate --remove-orphans -d
+            
+            # Обновление образов (pull) и перезапуск контейнеров
+            sudo /usr/local/bin/docker-compose -f docker-compose.yml pull
+            sudo /usr/local/bin/docker-compose -f docker-compose.yml up --force-recreate --remove-orphans -d
             
             echo "Deployment finished successfully."
