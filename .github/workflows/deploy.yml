@@ -48,18 +48,15 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         
-      # --- ИСПОЛЬЗУЕМ НАДЕЖНЫЙ МЕНЕДЖЕР КЛЮЧЕЙ (shimataro/ssh-key-action) ---
+      # --- МЕНЕДЖЕР КЛЮЧЕЙ ---
       - name: Load SSH Key to Agent
         uses: shimataro/ssh-key-action@v2
         with:
           key: ${{ secrets.SSH_KEY }}
-          # known_hosts - обязательный параметр, здесь можно использовать заглушку
           known_hosts: 'placeholder-known-hosts' 
-      # ----------------------------------------------------------------------
+      # ------------------------
       
-      # --- ДИАГНОСТИКА: Проверка, видит ли агент ключ (поможет нам, если будет сбой) ---
-      - name: Check if Key is Loaded (Diagnostic)
-        run: ssh-add -l
+      # !!! УДАЛЕН ШАГ 'ssh-add -l' ВО ИЗБЕЖАНИЕ СБОЯ !!!
 
       # 4. Деплой на удаленный сервер через SSH (Ключ берется из агента)
       - name: Deploy to Remote Server (Using SSH Agent)
