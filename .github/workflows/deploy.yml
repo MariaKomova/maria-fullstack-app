@@ -48,22 +48,25 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         
-      # --- НОВЫЙ КРИТИЧЕСКИ ВАЖНЫЙ ШАГ: ЗАГРУЗКА КЛЮЧА В SSH-АГЕНТ ---
-      # Это решает все проблемы с форматированием, переносами и правами доступа.
-      - name: Start SSH Agent and Load Key
-        uses: webfactory/ssh-agent@v0.9.1
+      # --- ИСПОЛЬЗУЕМ НАДЕЖНЫЙ МЕНЕДЖЕР КЛЮЧЕЙ (shimataro/ssh-key-action) ---
+      - name: Load SSH Key to Agent
+        uses: shimataro/ssh-key-action@v2
         with:
-          ssh-private-key: ${{ secrets.SSH_KEY }}
-      # ------------------------------------------------------------------
+          key: ${{ secrets.SSH_KEY }}
+          # known_hosts - обязательный параметр, здесь можно использовать заглушку
+          known_hosts: 'placeholder-known-hosts' 
+      # ----------------------------------------------------------------------
+      
+      # --- ДИАГНОСТИКА: Проверка, видит ли агент ключ (поможет нам, если будет сбой) ---
+      - name: Check if Key is Loaded (Diagnostic)
+        run: ssh-add -l
 
-      # 4. Деплой на удаленный сервер через SSH (УДАЛЯЕМ key_path и key)
+      # 4. Деплой на удаленный сервер через SSH (Ключ берется из агента)
       - name: Deploy to Remote Server (Using SSH Agent)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
-          # Ключ автоматически берется из SSH-агента,
-          # поэтому key_path и key больше не нужны.
           port: 22
           
           # Команды, которые выполняются на Debian-сервере:
