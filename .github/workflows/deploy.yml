@@ -48,27 +48,22 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         
-      # --- НОВЫЙ ШАГ: ЗАПИСЬ ПРИВАТНОГО КЛЮЧА В ФАЙЛ ---
-      - name: Write SSH Key to File
-        id: write_key
-        run: |
-          # Создаем файл ключа, используя переменную окружения для обхода экранирования
-          echo "${{ secrets.SSH_KEY }}" > .ssh_key
-          # Устанавливаем правильные права доступа
-          chmod 600 .ssh_key
-          # Экспортируем путь к ключу для следующего шага
-          echo "KEY_PATH=$(pwd)/.ssh_key" >> $GITHUB_ENV
-      # --------------------------------------------------
+      # --- НОВЫЙ КРИТИЧЕСКИ ВАЖНЫЙ ШАГ: ЗАГРУЗКА КЛЮЧА В SSH-АГЕНТ ---
+      # Это решает все проблемы с форматированием, переносами и правами доступа.
+      - name: Start SSH Agent and Load Key
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.SSH_KEY }}
+      # ------------------------------------------------------------------
 
-      # 4. Деплой на удаленный сервер через SSH 
-      - name: Deploy to Remote Server (Using Key File)
+      # 4. Деплой на удаленный сервер через SSH (УДАЛЯЕМ key_path и key)
+      - name: Deploy to Remote Server (Using SSH Agent)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
-          # Используем путь к созданному файлу ключа
-          key_path: ${{ env.KEY_PATH }}
-          
+          # Ключ автоматически берется из SSH-агента,
+          # поэтому key_path и key больше не нужны.
           port: 22
           
           # Команды, которые выполняются на Debian-сервере:
