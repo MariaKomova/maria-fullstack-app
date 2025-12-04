@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # 1. СЕРВИС БАЗЫ ДАННЫХ (POSTGRESQL)
   db:
     image: postgres:15-alpine
     container_name: maria_db_1
@@ -14,24 +15,27 @@ services:
       - "5432:5432"
     restart: always
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"] # Добавлена проверка базы данных (-d)
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - app_network
 
+  # 2. СЕРВИС PYTHON BACKEND (FLASK/GUNICORN)
   backend:
-    image: moreiamoreia/fullstack-backend_v2:latest # Используем образ из CI/CD
+    image: moreiamoreia/fullstack-backend_v2:latest
     restart: unless-stopped
-    ports:
-      - "5000:5000"
-      - "8000:8000"
+    # УДАЛЕНО: порты 5000:5000 и 8000:8000. Бэкенд не должен быть виден напрямую снаружи.
+    expose:
+      - 8000 # Порт 8000 открыт только для других сервисов (например, Nginx) в сети Docker
     env_file:
       - .env
     environment:
       DATABASE_HOST: db
     volumes:
+      # Если образ собран в CI/CD, монтирование ./backend:/app может быть излишним или конфликтовать.
+      # Оставляем, если это нужно для hot-reload или доступа к локальным файлам.
       - ./backend:/app
     depends_on:
       db:
@@ -44,24 +48,24 @@ services:
     networks:
       - app_network
 
+  # 3. СЕРВИС FRONTEND / REVERSE PROXY (NGINX)
   frontend:
-    # ИСПРАВЛЕНО: Используем образ, собранный и отправленный вашим CI/CD пайплайном
-    image: moreiamoreia/fullstack-frontend_v2:latest 
+    image: moreiamoreia/fullstack-frontend_v2:latest
     container_name: maria_frontend_1
     restart: always
     volumes:
-      # Оставляем монтирование nginx.conf для проксирования API, 
-      # но удаляем монтирование index.html, так как статика должна быть в образе.
-      - ./frontend/nginx.conf:/etc/nginx/nginx.conf:ro
+      # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ:
+      # Путь в контейнере изменен с /etc/nginx/nginx.conf на /etc/nginx/conf.d/default.conf
+      # (Это стандартное и безопасное место для пользовательских конфигов).
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
-      - "8080:80"
+      - "8080:80" # Открываем Nginx на порту 8080 хост-машины
     depends_on:
       - backend
     networks:
       - app_network
-    # Команда /bin/sh -c "sleep 10..." больше не нужна, если образ основан на Nginx и статика внутри.
-    # Если вам нужно, чтобы контейнер ждал, лучше использовать "depends_on: condition: service_healthy"
 
+  # 4. СЕРВИСЫ МОНИТОРИНГА
   loki:
     image: grafana/loki:latest
     container_name: loki
@@ -124,6 +128,7 @@ volumes:
   prometheus_data:
   promtail_positions:
   grafana_data:
+
 networks:
   app_network:
     driver: bridge
